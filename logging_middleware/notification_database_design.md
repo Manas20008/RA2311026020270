@@ -156,4 +156,115 @@ FROM notifications
 WHERE type = 'Placement'
 AND createdAt >= NOW() - INTERVAL '7 days';
 ```
+# Stage 4: Performance Optimization & Scaling
+
+## 1. Problem
+
+When the number of users increases, the system may face:
+
+* Slow API responses
+* High database load
+* Delay in notification delivery
+
+---
+
+## 2. Solutions
+
+### a) Caching
+
+Use Redis to store frequently accessed notifications.
+
+Benefits:
+
+* Faster response time
+* Reduces database load
+
+---
+
+### b) Pagination
+
+Instead of fetching all notifications:
+
+Use:
+
+```sql
+LIMIT 10 OFFSET 0
+```
+
+Benefits:
+
+* Reduces data transfer
+* Improves performance
+
+---
+
+### c) Database Indexing
+
+Indexes on:
+
+* studentID
+* isRead
+* createdAt
+
+Benefits:
+
+* Faster query execution
+
+---
+
+### d) Asynchronous Processing
+
+Use message queues (Kafka / RabbitMQ)
+
+Flow:
+
+* Notification created → pushed to queue
+* Worker processes → sends to users
+
+Benefits:
+
+* Handles high traffic
+* Non-blocking system
+
+---
+
+### e) Load Balancing
+
+Use multiple backend servers with load balancer.
+
+Benefits:
+
+* Distributes traffic
+* Improves availability
+
+---
+
+### f) Horizontal Scaling
+
+Add more servers when load increases.
+
+Benefits:
+
+* System can handle more users
+
+---
+
+## 3. Final Architecture Flow
+
+Client → Load Balancer → Backend Server → Cache (Redis) → Database
+
+Notification Flow:
+Backend → Queue → Worker → User (real-time)
+
+---
+
+## 4. Conclusion
+
+The system becomes:
+
+* Scalable
+* Fast
+* Reliable
+* Ready for large number of users
+
 
