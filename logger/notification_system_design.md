@@ -368,4 +368,158 @@ The system becomes:
 * Reliable
 * Ready for large number of users
 
+## Stage 5
+
+### Problems in given implementation
+
+The current approach has multiple issues:
+
+- It sends emails sequentially, which is slow for large users (50,000 students)
+- If sending email fails midway, some users receive notifications while others don’t
+- No retry mechanism is present
+- DB write and email sending are tightly coupled
+- No fault tolerance or recovery mechanism
+
+Example issue:
+If email fails for 200 students, those students will not receive notifications and system does not retry.
+
+---
+
+### Should DB save and email sending happen together?
+
+No.
+
+Saving to DB and sending email should be separated because:
+- DB write must always succeed (source of truth)
+- Email sending is an external operation and may fail
+- If both are tied together, failures will cause inconsistency
+
+---
+
+### Improved Approach
+
+1. First store all notifications in DB
+2. Push tasks into a queue (like message queue)
+3. Worker services process queue asynchronously
+4. Retry failed email deliveries
+5. Log failures for monitoring
+
+---
+
+### Revised Pseudocode
+
+function notify_all(student_ids, message):
+
+    for student_id in student_ids:
+        save_to_db(student_id, message)
+
+    for student_id in student_ids:
+        push_to_queue(student_id, message)
+
+
+Worker Process:
+
+while true:
+    task = get_from_queue()
+
+    try:
+        send_email(task.student_id, task.message)
+        push_to_app(task.student_id, task.message)
+    except:
+        retry(task)
+
+---
+
+### Benefits
+
+- Faster execution (parallel processing)
+- Reliable (retry mechanism)
+- Scalable for large users
+- No data loss
+
+## Stage 6
+
+### Approach
+
+Notifications should be sorted based on:
+1. Type priority (Placement > Result > Event)
+2. Timestamp (latest first)
+
+---
+
+### Priority Mapping
+
+Placement = 3  
+Result = 2  
+Event = 1  
+
+---
+
+### Logic
+
+1. Fetch notifications from API
+2. Assign priority score based on type
+3. Sort notifications:
+   - First by priority (descending)
+   - Then by timestamp (descending)
+4. Return top 10 notifications
+
+---
+
+### Code (JavaScript)
+
+const axios = require("axios");
+
+const token = "PASTE_YOUR_TOKEN_HERE";
+
+function getPriority(type) {
+    if (type === "Placement") return 3;
+    if (type === "Result") return 2;
+    return 1;
+}
+
+async function main() {
+    const res = await axios.get(
+        "http://20.207.122.201/evaluation-service/notifications",
+        {
+            headers: {
+                Authorization: `Bearer ${token}`
+            }
+        }
+    );
+
+    const notifications = res.data.notifications;
+
+    const sorted = notifications.sort((a, b) => {
+        const p1 = getPriority(a.Type);
+        const p2 = getPriority(b.Type);
+
+        if (p1 !== p2) return p2 - p1;
+
+        return new Date(b.Timestamp) - new Date(a.Timestamp);
+    });
+
+    const top10 = sorted.slice(0, 10);
+
+    console.log(top10);
+}
+
+main();
+
+---
+
+### Handling Continuous Incoming Data
+
+To maintain top 10 efficiently:
+- Use a Min Heap of size 10
+- Insert new notifications based on priority
+- Remove lowest priority item when size exceeds 10
+
+---
+
+### Benefits
+
+- Fast retrieval of important notifications
+- Works efficiently even with large data
+- Real-time updates possible
 
